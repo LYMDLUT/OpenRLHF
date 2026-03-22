@@ -55,6 +55,7 @@ from .checkpoint import (
 from .tp.tp_parallel import apply_tensor_parallel
 from .utils import (
     clip_grad_norm_dtensor,
+    get_grad_norm_dtensor,
     get_checkpoint_metadata,
     move_optimizer_state,
     moving_average_fsdp2,
@@ -502,7 +503,7 @@ class FSDP2Strategy(ABC):
             loss = loss / self.accumulated_gradient
         loss.backward()
 
-    def optimizer_step(self, optimizer, model, scheduler, name="model"):
+    def optimizer_step(self, optimizer, model, scheduler, name="model", grad_norm: float | None = None) -> bool:
         """Optimizer step with gradient accumulation.
 
         Returns:
@@ -513,8 +514,11 @@ class FSDP2Strategy(ABC):
         if self.optimizer_step_counters[key] % self.accumulated_gradient != 0:
             return False
 
+        unwrapped_model = self._unwrap_model(model)
         if self.max_norm > 0:
-            clip_grad_norm_dtensor(self._unwrap_model(model), max_norm=self.max_norm)
+            if grad_norm is None:
+                grad_norm = get_grad_norm_dtensor(unwrapped_model)
+            clip_grad_norm_dtensor(unwrapped_model, max_norm=self.max_norm, total_norm=grad_norm)
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
         if scheduler:
@@ -742,6 +746,11 @@ class FSDP2Strategy(ABC):
     # -------------------------------------------------------------------------
     # Utilities
     # -------------------------------------------------------------------------
+
+    def get_grad_norm(self, model) -> float:
+        """Return the current global gradient norm for a sharded model."""
+
+        return get_grad_norm_dtensor(self._unwrap_model(model))
 
     def print(self, *msg):
         """Rank-0 logging without prefix (public API, 30+ external callers)."""

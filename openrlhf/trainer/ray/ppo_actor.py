@@ -276,9 +276,10 @@ class ActorPPOTrainer(ABC):
             opt_update_boundary = self.replay_buffer.dynamic_is_last_micro_batch[step]
 
         self.strategy.backward(loss)
+        actor_grad_norm = self.strategy.get_grad_norm(self.actor)
         if opt_update_boundary:
             params_updated = self.strategy.optimizer_step(
-                self.actor_optim, self.actor, self.actor_scheduler, name="actor"
+                self.actor_optim, self.actor, self.actor_scheduler, name="actor", grad_norm=actor_grad_norm
             )
             if params_updated and self.ema_model:
                 self.strategy.moving_average(self.actor, self.ema_model, self.ema_beta)
@@ -287,7 +288,7 @@ class ActorPPOTrainer(ABC):
         status = {
             "policy_loss": actor_loss.detach().item(),
             "actor_lr": self.actor_scheduler.get_last_lr()[0],
-            "actor_grad_norm": self.strategy.get_grad_norm(self.actor),
+            "actor_grad_norm": actor_grad_norm,
         }
         if self.args.entropy_loss_coef is not None:
             status["entropy_loss"] = entropy_loss.detach().item()
