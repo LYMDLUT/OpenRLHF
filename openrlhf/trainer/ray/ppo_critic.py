@@ -286,7 +286,7 @@ class CriticModelActor(BaseModelActor):
         if self.disable_fsdp2_ckpt:
             return False
 
-        step_dir = os.path.join(self.strategy.dcp_ckpt_path, tag)
+        step_dir = os.path.join(self.strategy.ckpt_save_path, tag)
         self.strategy.save_dcp_checkpoint(
             self.critic,
             os.path.join(step_dir, "dcp_checkpoint", "_critic"),

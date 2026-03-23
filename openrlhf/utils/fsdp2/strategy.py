@@ -101,6 +101,7 @@ class FSDP2Strategy(ABC):
 
         # Derive checkpoint sub-paths from ckpt_save_path
         ckpt_save_path = getattr(args, "ckpt_save_path", None)
+        self.ckpt_save_path = ckpt_save_path
         if ckpt_save_path is not None:
             self.last_hf_ckpt_path = os.path.join(ckpt_save_path, "last_hf_ckpt")
             self.hf_ckpt_path = os.path.join(ckpt_save_path, "hf_ckpt")
@@ -667,7 +668,7 @@ class FSDP2Strategy(ABC):
     def cleanup_old_checkpoints(self, tag: str):
         """Write top-level latest marker and clean old step directories."""
         _cleanup_old_checkpoints(
-            self.dcp_ckpt_path,
+            self.ckpt_save_path,
             self.args.max_checkpoints_to_keep,
             tag=tag,
             is_rank_0=self.is_rank_0(),

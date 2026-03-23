@@ -600,7 +600,7 @@ class PolicyModelActor(BaseModelActor):
 
     def save_checkpoint(self, tag, client_states=None):
         args = self.strategy.args
-        step_dir = os.path.join(self.strategy.dcp_ckpt_path, tag)
+        step_dir = os.path.join(self.strategy.ckpt_save_path, tag)
         dcp_dir = os.path.join(step_dir, "dcp_checkpoint")
         any_checkpoint_saved = False
         if not self.disable_fsdp2_ckpt:

@@ -225,7 +225,7 @@ class RewardModelTrainer(ABC):
         # TODO: save best model on dev, use loss/perplexity on whole dev dataset as metric
         if global_step % args.save_steps == 0:
             tag = f"global_step_{global_step}"
-            step_dir = os.path.join(self.strategy.dcp_ckpt_path, tag)
+            step_dir = os.path.join(self.strategy.ckpt_save_path, tag)
             any_checkpoint_saved = False
             if not self.disable_fsdp2_ckpt:
                 self.strategy.save_dcp_checkpoint(
