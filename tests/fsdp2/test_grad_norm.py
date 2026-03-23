@@ -61,7 +61,6 @@ def _build_strategy_args() -> SimpleNamespace:
         param_dtype="fp32",
         fsdp2_cpu_offload=False,
         fsdp2_reshard_after_forward=True,
-        fsdp2_tp_sequence_parallel=False,
         fsdp2_enable_sleep=False,
     )
 

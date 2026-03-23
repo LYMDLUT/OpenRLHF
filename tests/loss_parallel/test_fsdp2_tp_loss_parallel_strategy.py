@@ -59,7 +59,6 @@ def _build_strategy_args(*, tp_size: int, loss_parallel: bool) -> SimpleNamespac
         param_dtype="fp32",
         fsdp2_cpu_offload=False,
         fsdp2_reshard_after_forward=True,
-        fsdp2_tp_sequence_parallel=False,
         fsdp2_enable_sleep=False,
     )
 
@@ -81,12 +80,11 @@ def test_apply_parallelism_forwards_shard_logits(monkeypatch: pytest.MonkeyPatch
     sentinel = object()
     apply_tp_calls = []
 
-    def _fake_apply_tensor_parallel(model_obj, tp_mesh, sequence_parallel, validate, shard_logits):
+    def _fake_apply_tensor_parallel(model_obj, tp_mesh, validate, shard_logits):
         apply_tp_calls.append(
             {
                 "model": model_obj,
                 "tp_mesh": tp_mesh,
-                "sequence_parallel": sequence_parallel,
                 "validate": validate,
                 "shard_logits": shard_logits,
             }
@@ -101,7 +99,6 @@ def test_apply_parallelism_forwards_shard_logits(monkeypatch: pytest.MonkeyPatch
     assert len(apply_tp_calls) == 1
     assert apply_tp_calls[0]["model"] is model
     assert apply_tp_calls[0]["tp_mesh"] == "tp-mesh"
-    assert apply_tp_calls[0]["sequence_parallel"] is False
     assert apply_tp_calls[0]["validate"] is True
     assert apply_tp_calls[0]["shard_logits"] is loss_parallel
 

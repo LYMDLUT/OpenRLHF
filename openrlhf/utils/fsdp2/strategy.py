@@ -86,7 +86,6 @@ class FSDP2Strategy(ABC):
         self.param_dtype = args.param_dtype
         self.fsdp2_cpu_offload = args.fsdp2_cpu_offload
         self.fsdp2_reshard_after_forward = args.fsdp2_reshard_after_forward
-        self.sequence_parallel = args.fsdp2_tp_sequence_parallel
 
         # CPUOffloadPolicy and manual offload (fsdp2_enable_sleep) are mutually exclusive:
         # FSDP2 manages CPU offload automatically when fsdp2_cpu_offload is enabled.
@@ -139,17 +138,6 @@ class FSDP2Strategy(ABC):
         ), f"world_size({self.world_size}) not divisible by cp*tp({cp_tp_factor})"
         self.fsdp2_dp_size = self.world_size // cp_tp_factor
 
-        # Sequence Parallel (SP) is only meaningful with TP>1.
-        if self.sequence_parallel:
-            if self.fsdp2_tp_size <= 1:
-                raise ValueError("Invalid config: --fsdp2_tp_sequence_parallel requires --fsdp2_tp_size > 1.")
-            if not getattr(self.args, "packing_samples", False):
-                raise ValueError(
-                    "--fsdp2_tp_sequence_parallel requires --packing_samples to be enabled, "
-                    "because HF's causal mask creation uses inputs_embeds.shape[1] "
-                    "which would be seq/tp_size after SP sharding, causing mask length mismatch."
-                )
-
         # Always create 3D mesh even if some dims are size=1, so all parameters
         # share the same mesh structure (avoids mismatch in clip_grad_norm etc.)
         self.mesh = init_device_mesh(
@@ -172,10 +160,6 @@ class FSDP2Strategy(ABC):
         # Initialize ring attention defaults
         set_ring_attn_group(None)
         set_ring_attn_pad_multiple(1)
-
-        if self.sequence_parallel and self.fsdp2_tp_size > 1:
-            # Pad packed sequence length to be divisible by TP degree for SP
-            set_ring_attn_pad_multiple(self.fsdp2_tp_size)
 
         if self.fsdp2_cp_size > 1:
             set_ring_attn_group(self.cp_group)
@@ -239,7 +223,6 @@ class FSDP2Strategy(ABC):
             unwrapped = apply_tensor_parallel(
                 unwrapped,
                 self.mesh["tp"],
-                sequence_parallel=self.sequence_parallel,
                 validate=True,
                 shard_logits=self.fsdp2_tp_loss_parallel,
             )

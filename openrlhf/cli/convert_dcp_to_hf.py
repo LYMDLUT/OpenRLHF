@@ -94,7 +94,6 @@ if __name__ == "__main__":
     parser.add_argument("--fsdp2_cp_size", type=int, default=1, help="Context parallel size")
     parser.add_argument("--fsdp2_cpu_offload", action="store_true", default=False, help="Enable CPU offload")
     parser.add_argument("--fsdp2_reshard_after_forward", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--fsdp2_tp_sequence_parallel", action="store_true", default=False)
     parser.add_argument(
         "--fsdp2_tp_loss_parallel",
         action="store_true",

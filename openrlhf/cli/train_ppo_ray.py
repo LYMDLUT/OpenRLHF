@@ -337,12 +337,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--fsdp2_tp_size", type=int, default=1, help="FSDP2 tensor parallel size")
     parser.add_argument(
-        "--fsdp2_tp_sequence_parallel",
-        action="store_true",
-        default=False,
-        help="Enable sequence parallelism for FSDP2+TP (requires --fsdp2_tp_size > 1).",
-    )
-    parser.add_argument(
         "--fsdp2_tp_loss_parallel",
         action="store_true",
         default=False,

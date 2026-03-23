@@ -14,7 +14,6 @@ from .loss_parallel import (
 )
 from .tp_parallel import (
     ReplicateParallel,
-    SequenceParallelPreserveGrad,
     apply_tensor_parallel,
     get_tp_plan,
     validate_tp_mesh,
@@ -23,7 +22,6 @@ from .tp_parallel import (
 __all__ = [
     # Parallel Styles
     "ReplicateParallel",
-    "SequenceParallelPreserveGrad",
     # TP Plan Functions
     "apply_tensor_parallel",
     "get_tp_plan",
