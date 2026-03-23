@@ -106,16 +106,41 @@ class SequenceParallelPreserveGrad(SequenceParallel):
 # === Base utilities ===
 
 
+def _headwise_replicate_parallel() -> ReplicateParallel:
+    """Replicate parameters while preserving head-dimension sharding on activations.
+
+    This matches HF TP styles such as ``replicated_with_grad_allreduce`` used
+    by Q/K norms that sit between colwise and rowwise projections.
+    """
+    return ReplicateParallel(
+        input_layout=Shard(2),
+        desired_input_layout=Shard(2),
+        output_layout=Shard(2),
+        use_local_output=True,
+    )
+
+
 def _parse_parallel_style(style_name: str) -> ParallelStyle:
     """Convert a string shorthand to a ``ParallelStyle`` instance.
 
     Args:
-        style_name: One of ``"colwise"``, ``"rowwise"``, ``"colwise_rep"``,
-            ``"rowwise_rep"``, ``"sequence_parallel"``, ``"replicate"``.
+        style_name: One of the native OpenRLHF shorthands or compatible
+            HuggingFace TP plan names such as ``"colwise_gather_output"`` and
+            ``"rowwise_split_input"``.
 
     Returns:
         The corresponding ``ParallelStyle`` instance.
     """
+    aliases = {
+        # Backward compatibility for pre-Transformers-v5 OpenRLHF plan names.
+        "colwise_gather_output": "colwise_rep",
+        "rowwise_split_input": "rowwise_rep",
+        # HF v5 plan names that have direct equivalents in this DTensor-based implementation.
+        "embedding_rowwise": "rowwise_rep",
+        "packed_colwise": "colwise",
+        "packed_rowwise": "rowwise",
+    }
+    canonical_name = aliases.get(style_name, style_name)
     styles: dict[str, ParallelStyle] = {
         "colwise": ColwiseParallel(),
         "rowwise": RowwiseParallel(),
@@ -123,8 +148,16 @@ def _parse_parallel_style(style_name: str) -> ParallelStyle:
         "rowwise_rep": RowwiseParallel(input_layouts=Replicate()),
         "sequence_parallel": SequenceParallelPreserveGrad(),
         "replicate": ReplicateParallel(),
+        "replicated_with_grad_allreduce": _headwise_replicate_parallel(),
     }
-    return styles[style_name]
+    try:
+        return styles[canonical_name]
+    except KeyError as exc:
+        supported_names = ", ".join(sorted({*styles, *aliases}))
+        raise ValueError(
+            f"Unsupported tensor parallel style: {style_name!r}. "
+            f"Supported styles: {supported_names}"
+        ) from exc
 
 
 # === Architecture-specific TP plan definitions ===
@@ -222,23 +255,9 @@ def _build_qwen_tp_plan(model: nn.Module, sequence_parallel: bool) -> dict[str, 
     head-sharded activations after the QKV reshape.
     """
 
-    def _replicate_on_head_dim() -> ReplicateParallel:
-        """Create a ReplicateParallel that preserves Shard(2) on the head dimension.
-
-        Used for norms that operate on head-sharded activations with shape
-        ``(batch, seq, num_heads, head_dim)`` — e.g. Q/K RMSNorm in Qwen models.
-        Shard(2) marks the heads dimension so DTensor correctly all-reduces grads.
-        """
-        return ReplicateParallel(
-            input_layout=Shard(2),
-            desired_input_layout=Shard(2),
-            output_layout=Shard(2),
-            use_local_output=True,
-        )
-
     plan = _build_default_tp_plan(sequence_parallel, SequenceParallelPreserveGrad)
-    plan["model.layers.*.self_attn.q_norm"] = _replicate_on_head_dim()
-    plan["model.layers.*.self_attn.k_norm"] = _replicate_on_head_dim()
+    plan["model.layers.*.self_attn.q_norm"] = _headwise_replicate_parallel()
+    plan["model.layers.*.self_attn.k_norm"] = _headwise_replicate_parallel()
     return plan
 
 
